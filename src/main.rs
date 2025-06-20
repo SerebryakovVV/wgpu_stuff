@@ -15,7 +15,8 @@
 mod example_compute;
 use example_compute::run_example_compute;
 
-
+mod example_window;
+use example_window::run_example_window;
 
 
 
@@ -87,7 +88,8 @@ fn main() {
 
 
 
-  run_example_compute();
+  // run_example_compute();
+  run_example_window();
   return;
 
 
