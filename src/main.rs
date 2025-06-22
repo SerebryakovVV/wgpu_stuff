@@ -11,93 +11,176 @@
 
 
 
-
-mod example_compute;
-use example_compute::run_example_compute;
-
-mod example_window;
-use example_window::run_example_window;
+// triangle fan, shader masking
 
 
+// instancing
+
+
+use std::sync::Arc;
+use wgpu::{Adapter, Device, Instance, Queue, Surface, TextureFormat};
+use winit::{
+  application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{
+    self,
+    ActiveEventLoop,
+    EventLoop
+  }, window::{
+    Window, 
+    WindowAttributes,
+    WindowId
+  }
+};
 
 
 
 
-// use std::io::Write;
+struct App {
+  window: Option<Arc<Window>>,
+  gfx_state: Option<GfxState>
+}
 
-// #[derive(Default)]
-// struct App {
-//   window: Option<winit::window::Window>,
-// }
+impl App {
+  fn new() -> Self {
+    Self {
+      window: None,
+      gfx_state: None
+    }
+  }
 
-// impl winit::application::ApplicationHandler for App {
-//   fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-//     if let None = self.window {
-//       let win = event_loop
-//         .create_window(winit::window::Window::default_attributes())
-//         .expect("Error creating window!");
-//       self.window = Some(win);
-//       println!("resumed from none");
-//     };
-//     println!("resumed");
-//   }
+  fn render(&mut self) {
+    let gfx_state = self.gfx_state.as_mut().unwrap();
+    let surface_texture = gfx_state.surface.get_current_texture().unwrap();
+    let texture_view = surface_texture.texture.create_view(&wgpu::wgt::TextureViewDescriptor {format: Some(gfx_state.surface_fmt) ,..Default::default()});
+    let mut encoder = gfx_state.device.create_command_encoder(&Default::default());
+    let renderpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: None, 
+      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        view: &texture_view,
+        resolve_target: None,
+        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::RED), store: wgpu::StoreOp::Store }
+      })], 
+      depth_stencil_attachment: None, 
+      timestamp_writes: None, 
+      occlusion_query_set: None 
+    });
+    drop(renderpass);
+    gfx_state.queue.submit([encoder.finish()]);
+    self.window.as_ref().unwrap().pre_present_notify();
+    surface_texture.present();
+  }
 
-//   fn window_event(
-//     &mut self,
-//     event_loop: &winit::event_loop::ActiveEventLoop,
-//     window_id: winit::window::WindowId,
-//     event: winit::event::WindowEvent,
-//   ) {
-//     match event {
-//       winit::event::WindowEvent::CursorEntered { .. } => println!("Cursor entered"),
-//       winit::event::WindowEvent::Resized(size) => println!("Resized to {:#?}", size),
-//       winit::event::WindowEvent::CloseRequested => {
-//         println!("Close requested");
-//         event_loop.exit()
-//       }
-//       _ => {
-//         // println!("Rest of the events");
-//       }
-//     }
-//   }
-//   // those are required methods, this trait also has some optional ones
-// }
+  fn configure_surface(&mut self) {
+    let gfx_state = self.gfx_state.as_mut().unwrap();
+    let config = wgpu::SurfaceConfiguration {
+      alpha_mode: wgpu::CompositeAlphaMode::Auto,
+      desired_maximum_frame_latency: 2,
+      format: gfx_state.surface_fmt,
+      height: gfx_state.size.height,
+      width: gfx_state.size.width,
+      present_mode: wgpu::PresentMode::AutoVsync,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats: vec![gfx_state.surface_fmt.add_srgb_suffix()]
+    };
+    gfx_state.surface.configure(&gfx_state.device, &config);
+  }
+}
+
+impl ApplicationHandler for App {
+  fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+    self.window = Some(
+      Arc::new(
+        event_loop.create_window(
+          WindowAttributes::default()
+        ).unwrap()
+      )
+    );
+    self.gfx_state = Some(
+      pollster::block_on(
+        GfxState::setup(
+          self
+          .window
+          .as_ref()
+          .unwrap()
+          .clone()
+        )
+      )
+    );
+    self.configure_surface();
+  }
+
+  fn window_event(
+    &mut self,
+    event_loop: &ActiveEventLoop,
+    window_id: WindowId,
+    event: WindowEvent,
+  ) {
+    match event {
+      WindowEvent::CursorEntered { .. } => println!("Cursor entered"),
+      WindowEvent::Resized(size) => println!("Resized to {:#?}", size),
+      WindowEvent::CloseRequested => {
+        println!("Close requested");
+        event_loop.exit()
+      },
+      WindowEvent::RedrawRequested => self.render(),
+      _ => {
+        // println!("Rest of the events");
+      }
+    }
+  }
+}
 
 
-// async fn setup(window: &winit::window::Window) {
-// 		let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
-// 		// i need to create the window first
-// 		// add the new() method to the app
-// 		let surface = instance.create_surface(window).unwrap();
-// 		let adapter = instance.request_adapter(
-// 			&wgpu::RequestAdapterOptions {
-// 				compatible_surface: Some(&surface),
-// 				..Default::default()
-// 			}
-// 		).await.unwrap();
-// 		let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor{..Default::default()}).await.unwrap();
 
-		
 
-// 		// Its primary use is to create Adapters and Surfaces.
 
-// }
+struct GfxState {
+  instance: Instance,
+  surface: Surface<'static>,
+  adapter: Adapter,
+  device: Device,
+  queue: Queue,
+  surface_fmt: TextureFormat,
+  size: PhysicalSize<u32>
+}
+
+impl GfxState {
+  async fn setup(window: Arc<Window>) -> Self {
+		let instance = Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
+		let surface = instance.create_surface(window.clone()).unwrap();
+    let size = window.inner_size();
+		let adapter = instance.request_adapter(
+			&wgpu::RequestAdapterOptions {
+				compatible_surface: Some(&surface),
+				..Default::default()
+			}
+		).await.unwrap();
+		let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor{..Default::default()}).await.unwrap();
+    let surface_fmt = surface.get_capabilities(&adapter).formats[0];
+    Self {
+      instance,
+      surface,
+      size,
+      adapter,
+      device,
+      queue,
+      surface_fmt
+    }
+  }
+}
+
+
+
+
+struct BodiesState {
+  bodies: Vec<Body>
+}
+
+struct Body {}
 
 
 fn main() {
-
-
-
-  // run_example_compute();
-  run_example_window();
-  return;
-
-
-
-  // let event_loop = winit::event_loop::EventLoop::new().unwrap();
-  // let mut app = App::default();
-	// if let Some(w) = app.window.as_ref() {
-	// 	setup(w);
-	// }
-  // event_loop.run_app(&mut app);
+  env_logger::init();
+  let mut app = App::new();
+  let event_loop = EventLoop::new().unwrap();
+  event_loop.run_app(&mut app);
 }
