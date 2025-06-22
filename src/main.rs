@@ -11,14 +11,17 @@
 
 
 
+
 // triangle fan, shader masking
-
-
 // instancing
-
+// shader module
+// pipeline layout
+// pipeline 
+// render method update
 
 use std::sync::Arc;
-use wgpu::{Adapter, Device, Instance, Queue, Surface, TextureFormat};
+use bytemuck::{Pod, Zeroable};
+use wgpu::{util::DeviceExt, Adapter, Buffer, Device, Instance, Queue, Surface, TextureFormat};
 use winit::{
   application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{
     self,
@@ -34,16 +37,52 @@ use winit::{
 
 
 
+struct Body {
+  vertex_data: Vec<Vertex>,
+  index_data: Vec<u8>
+}
+
+#[repr(C)]
+#[derive(Pod, Clone, Copy, Zeroable)]
+struct Vertex {
+  position: [f32; 3],
+  color: [f32; 3]
+}
+
+
 struct App {
   window: Option<Arc<Window>>,
-  gfx_state: Option<GfxState>
+  gfx_state: Option<GfxState>,
+  bodies: Vec<Body>
 }
 
 impl App {
   fn new() -> Self {
+    let vertex_data = vec![
+      Vertex { position: [-1.0, -1.0,  1.0], color: [1.0, 0.0, 0.0] },
+      Vertex { position: [ 1.0, -1.0,  1.0], color: [0.0, 1.0, 0.0] },
+      Vertex { position: [ 1.0,  1.0,  1.0], color: [0.0, 0.0, 1.0] },
+      Vertex { position: [-1.0,  1.0,  1.0], color: [1.0, 1.0, 0.0] },
+      Vertex { position: [-1.0, -1.0, -1.0], color: [1.0, 0.0, 1.0] },
+      Vertex { position: [ 1.0, -1.0, -1.0], color: [0.0, 1.0, 1.0] },
+      Vertex { position: [ 1.0,  1.0, -1.0], color: [1.0, 1.0, 1.0] },
+      Vertex { position: [-1.0,  1.0, -1.0], color: [0.0, 0.0, 0.0] },
+    ];
+    let index_data = vec![
+      0, 1, 2, 2, 3, 0,
+      4, 5, 6, 6, 7, 4,
+      0, 4, 7, 7, 3, 0,
+      1, 5, 6, 6, 2, 1,
+      3, 2, 6, 6, 7, 3,
+      0, 1, 5, 5, 4, 0,
+    ];
     Self {
       window: None,
-      gfx_state: None
+      gfx_state: None,
+      bodies: vec![Body {
+        vertex_data,
+        index_data
+      }]
     }
   }
 
@@ -102,6 +141,8 @@ impl ApplicationHandler for App {
           .as_ref()
           .unwrap()
           .clone()
+          ,
+          &self.bodies
         )
       )
     );
@@ -130,9 +171,6 @@ impl ApplicationHandler for App {
 }
 
 
-
-
-
 struct GfxState {
   instance: Instance,
   surface: Surface<'static>,
@@ -140,11 +178,13 @@ struct GfxState {
   device: Device,
   queue: Queue,
   surface_fmt: TextureFormat,
-  size: PhysicalSize<u32>
+  size: PhysicalSize<u32>,
+  vertex_buffer: Buffer,
+  index_buffer: Buffer
 }
 
 impl GfxState {
-  async fn setup(window: Arc<Window>) -> Self {
+  async fn setup(window: Arc<Window>, bodies: &Vec<Body>) -> Self {
 		let instance = Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
 		let surface = instance.create_surface(window.clone()).unwrap();
     let size = window.inner_size();
@@ -156,6 +196,35 @@ impl GfxState {
 		).await.unwrap();
 		let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor{..Default::default()}).await.unwrap();
     let surface_fmt = surface.get_capabilities(&adapter).formats[0];
+
+    // creating the index and vertex buffers here, probably
+
+    let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+      label: Some("Vertex buffer"),
+      usage: wgpu::BufferUsages::VERTEX,
+      contents: bytemuck::cast_slice(&bodies[0].vertex_data)
+    });    
+
+    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+      label: Some("Index buffer"),
+      usage: wgpu::BufferUsages::INDEX,
+      contents: &bodies[0].index_data
+    });
+
+
+
+
+    // let shader = device.create_shader_module();
+
+    // let pipeline_layout = device.create_pipeline_layout(desc);
+
+    // let render_pipeline = device.create_render_pipeline();
+
+    
+ 
+
+
+
     Self {
       instance,
       surface,
@@ -163,19 +232,13 @@ impl GfxState {
       adapter,
       device,
       queue,
-      surface_fmt
+      surface_fmt,
+      vertex_buffer,
+      index_buffer
     }
   }
 }
 
-
-
-
-struct BodiesState {
-  bodies: Vec<Body>
-}
-
-struct Body {}
 
 
 fn main() {
