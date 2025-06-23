@@ -19,9 +19,9 @@
 // pipeline 
 // render method update
 
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
-use wgpu::{util::DeviceExt, Adapter, Buffer, Device, Instance, Queue, Surface, TextureFormat};
+use wgpu::{util::DeviceExt, Adapter, Buffer, Device, Instance, Queue, RenderPipeline, ShaderModule, Surface, TextureFormat};
 use winit::{
   application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{
     self,
@@ -39,7 +39,7 @@ use winit::{
 
 struct Body {
   vertex_data: Vec<Vertex>,
-  index_data: Vec<u8>
+  index_data: Vec<u16>
 }
 
 #[repr(C)]
@@ -89,9 +89,9 @@ impl App {
   fn render(&mut self) {
     let gfx_state = self.gfx_state.as_mut().unwrap();
     let surface_texture = gfx_state.surface.get_current_texture().unwrap();
-    let texture_view = surface_texture.texture.create_view(&wgpu::wgt::TextureViewDescriptor {format: Some(gfx_state.surface_fmt) ,..Default::default()});
+    let texture_view = surface_texture.texture.create_view(&wgpu::wgt::TextureViewDescriptor {format: Some(gfx_state.surface_fmt) ,..Default::default()});    
     let mut encoder = gfx_state.device.create_command_encoder(&Default::default());
-    let renderpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+    let mut renderpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: None, 
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
         view: &texture_view,
@@ -102,6 +102,11 @@ impl App {
       timestamp_writes: None, 
       occlusion_query_set: None 
     });
+    renderpass.set_pipeline(&gfx_state.render_pipeline);
+    renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
+    renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+    renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
+
     drop(renderpass);
     gfx_state.queue.submit([encoder.finish()]);
     self.window.as_ref().unwrap().pre_present_notify();
@@ -180,7 +185,9 @@ struct GfxState {
   surface_fmt: TextureFormat,
   size: PhysicalSize<u32>,
   vertex_buffer: Buffer,
-  index_buffer: Buffer
+  index_buffer: Buffer,
+  shader: ShaderModule,
+  render_pipeline: RenderPipeline
 }
 
 impl GfxState {
@@ -208,23 +215,61 @@ impl GfxState {
     let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Index buffer"),
       usage: wgpu::BufferUsages::INDEX,
-      contents: &bodies[0].index_data
+      contents: bytemuck::cast_slice(&bodies[0].index_data)
     });
-
-
-
-
-    // let shader = device.create_shader_module();
-
-    // let pipeline_layout = device.create_pipeline_layout(desc);
-
-    // let render_pipeline = device.create_render_pipeline();
-
-    
- 
-
-
-
+    let shader = device.create_shader_module(wgpu::include_wgsl!("3d_model_render_shader.wgsl"));
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
+      label: Some("pipeline layout label"), 
+      bind_group_layouts: &[], 
+      push_constant_ranges: &[] 
+    });
+    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor { 
+      label: Some("Render pipeline"), 
+      layout: Some(&pipeline_layout), 
+      vertex: wgpu::VertexState { 
+        module: &shader, 
+        entry_point: Some("vs_main"), 
+        compilation_options: Default::default(), 
+        buffers: &[
+          wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+              wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float32x3
+              },
+              wgpu::VertexAttribute {
+                offset: 12,
+                shader_location: 1,
+                format: wgpu::VertexFormat::Float32x3,
+              },
+            ]
+          }
+        ]
+      }, 
+      primitive: wgpu::PrimitiveState { 
+        topology: wgpu::PrimitiveTopology::TriangleList, 
+        front_face: wgpu::FrontFace::Ccw, 
+        cull_mode: Some(wgpu::Face::Back), 
+        ..Default::default()
+      }, 
+      depth_stencil: None, 
+      multisample: wgpu::MultisampleState::default(), 
+      fragment: Some(wgpu::FragmentState { 
+        module: &shader, 
+        entry_point: Some("fs_main"), 
+        compilation_options: Default::default(), 
+        targets: &[Some(wgpu::ColorTargetState { 
+          format: surface_fmt, 
+          blend: Some(wgpu::BlendState::REPLACE), 
+          write_mask: wgpu::ColorWrites::ALL 
+        })]
+      }), 
+      multiview: None, 
+      cache: None
+    });
     Self {
       instance,
       surface,
@@ -234,7 +279,9 @@ impl GfxState {
       queue,
       surface_fmt,
       vertex_buffer,
-      index_buffer
+      index_buffer,
+      shader,
+      render_pipeline
     }
   }
 }
