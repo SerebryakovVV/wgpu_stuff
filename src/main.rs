@@ -19,6 +19,10 @@
 // pipeline 
 // render method update
 
+mod model;
+use model::Model;
+// use model;
+
 use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
 use wgpu::{util::DeviceExt, Adapter, Buffer, Device, Instance, Queue, RenderPipeline, ShaderModule, Surface, TextureFormat};
@@ -59,22 +63,28 @@ struct App {
 impl App {
   fn new() -> Self {
     let vertex_data = vec![
-      Vertex { position: [-1.0, -1.0,  1.0], color: [1.0, 0.0, 0.0] },
-      Vertex { position: [ 1.0, -1.0,  1.0], color: [0.0, 1.0, 0.0] },
-      Vertex { position: [ 1.0,  1.0,  1.0], color: [0.0, 0.0, 1.0] },
-      Vertex { position: [-1.0,  1.0,  1.0], color: [1.0, 1.0, 0.0] },
-      Vertex { position: [-1.0, -1.0, -1.0], color: [1.0, 0.0, 1.0] },
-      Vertex { position: [ 1.0, -1.0, -1.0], color: [0.0, 1.0, 1.0] },
-      Vertex { position: [ 1.0,  1.0, -1.0], color: [1.0, 1.0, 1.0] },
-      Vertex { position: [-1.0,  1.0, -1.0], color: [0.0, 0.0, 0.0] },
+      // Vertex { position: [-1.0, -1.0,  1.0], color: [1.0, 0.0, 0.0] },
+      // Vertex { position: [ 1.0, -1.0,  1.0], color: [0.0, 1.0, 0.0] },
+      // Vertex { position: [ 1.0,  1.0,  1.0], color: [0.0, 0.0, 1.0] },
+      // Vertex { position: [-1.0,  1.0,  1.0], color: [1.0, 1.0, 0.0] },
+      // Vertex { position: [-1.0, -1.0, -1.0], color: [1.0, 0.0, 1.0] },
+      // Vertex { position: [ 1.0, -1.0, -1.0], color: [0.0, 1.0, 1.0] },
+      // Vertex { position: [ 1.0,  1.0, -1.0], color: [1.0, 1.0, 1.0] },
+      // Vertex { position: [-1.0,  1.0, -1.0], color: [0.0, 0.0, 0.0] },
+      Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Bottom-left
+      Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Bottom-right
+      Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Top-right
+      Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Top-left
     ];
     let index_data = vec![
-      0, 1, 2, 2, 3, 0,
-      4, 5, 6, 6, 7, 4,
-      0, 4, 7, 7, 3, 0,
-      1, 5, 6, 6, 2, 1,
-      3, 2, 6, 6, 7, 3,
-      0, 1, 5, 5, 4, 0,
+      // 0, 1, 2, 2, 3, 0,
+      // 4, 5, 6, 6, 7, 4,
+      // 0, 4, 7, 7, 3, 0,
+      // 1, 5, 6, 6, 2, 1,
+      // 3, 2, 6, 6, 7, 3,
+      // 0, 1, 5, 5, 4, 0,
+      0, 1, 2, // First triangle
+      2, 3, 0, // Second triangle
     ];
     Self {
       window: None,
@@ -102,10 +112,10 @@ impl App {
       timestamp_writes: None, 
       occlusion_query_set: None 
     });
-    // renderpass.set_pipeline(&gfx_state.render_pipeline);
-    // renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
-    // renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-    // renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
+    renderpass.set_pipeline(&gfx_state.render_pipeline);
+    renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
+    renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+    renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
 
     drop(renderpass);
     gfx_state.queue.submit([encoder.finish()]);
