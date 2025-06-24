@@ -102,10 +102,10 @@ impl App {
       timestamp_writes: None, 
       occlusion_query_set: None 
     });
-    renderpass.set_pipeline(&gfx_state.render_pipeline);
-    renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
-    renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-    renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
+    // renderpass.set_pipeline(&gfx_state.render_pipeline);
+    // renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
+    // renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+    // renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
 
     drop(renderpass);
     gfx_state.queue.submit([encoder.finish()]);
@@ -115,6 +115,7 @@ impl App {
 
   fn configure_surface(&mut self) {
     let gfx_state = self.gfx_state.as_mut().unwrap();
+    gfx_state.size = self.window.as_mut().unwrap().inner_size();
     let config = wgpu::SurfaceConfiguration {
       alpha_mode: wgpu::CompositeAlphaMode::Auto,
       desired_maximum_frame_latency: 2,
@@ -126,6 +127,7 @@ impl App {
       view_formats: vec![gfx_state.surface_fmt.add_srgb_suffix()]
     };
     gfx_state.surface.configure(&gfx_state.device, &config);
+    // self.render();
   }
 }
 
@@ -162,7 +164,12 @@ impl ApplicationHandler for App {
   ) {
     match event {
       WindowEvent::CursorEntered { .. } => println!("Cursor entered"),
-      WindowEvent::Resized(size) => println!("Resized to {:#?}", size),
+      WindowEvent::Resized(size) => {
+        if size.height > 0 && size.width > 0 {
+          self.configure_surface();
+        }
+        println!("Resized to {:#?}", size);
+      },
       WindowEvent::CloseRequested => {
         println!("Close requested");
         event_loop.exit()
