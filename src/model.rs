@@ -4,8 +4,8 @@ use bytemuck::{Pod, Zeroable};
 
 #[derive(Debug)]
 pub struct Model {
-  vertices:Vec<[f32; 3]>,
-  indices: Vec<u16>
+  pub vertices:Vec<[f32; 3]>,
+  pub indices: Vec<u16>
 }
 
 
@@ -42,6 +42,6 @@ struct Vertex {
 
 #[test]
 fn test_model_loading() {
-  let a = Model::from_obj("src/test.obj");
+  let a = Model::from_obj("src/teapot.obj");
   println!("{:#?}", a.unwrap());
 }

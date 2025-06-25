@@ -62,30 +62,46 @@ struct App {
 
 impl App {
   fn new() -> Self {
+
+    // let vertex_data = vec![
+    //   Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [-1.0,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    // ];
+    // let index_data = vec![
+    //   0, 1, 2, 
+    //   2, 3, 0, 
+    //   3, 4, 0
+    // ];
+
+
+
+
     let vertex_data = vec![
-      // Vertex { position: [-1.0, -1.0,  1.0], color: [1.0, 0.0, 0.0] },
-      // Vertex { position: [ 1.0, -1.0,  1.0], color: [0.0, 1.0, 0.0] },
-      // Vertex { position: [ 1.0,  1.0,  1.0], color: [0.0, 0.0, 1.0] },
-      // Vertex { position: [-1.0,  1.0,  1.0], color: [1.0, 1.0, 0.0] },
-      // Vertex { position: [-1.0, -1.0, -1.0], color: [1.0, 0.0, 1.0] },
-      // Vertex { position: [ 1.0, -1.0, -1.0], color: [0.0, 1.0, 1.0] },
-      // Vertex { position: [ 1.0,  1.0, -1.0], color: [1.0, 1.0, 1.0] },
-      // Vertex { position: [-1.0,  1.0, -1.0], color: [0.0, 0.0, 0.0] },
-      Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Bottom-left
-      Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Bottom-right
-      Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Top-right
-      Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, // Top-left
+      Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 0.10, 0.40, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 0.05,  0.48, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 0.0,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
     ];
     let index_data = vec![
-      // 0, 1, 2, 2, 3, 0,
-      // 4, 5, 6, 6, 7, 4,
-      // 0, 4, 7, 7, 3, 0,
-      // 1, 5, 6, 6, 2, 1,
-      // 3, 2, 6, 6, 7, 3,
-      // 0, 1, 5, 5, 4, 0,
-      0, 1, 2, // First triangle
-      2, 3, 0, // Second triangle
+      0, 1, 2, 
+      2, 3, 0, 
     ];
+
+
+    // let a = Model::from_obj("src/teapot.obj").unwrap();
+    // let mut vertex_data = Vec::new();
+    // for v in a.vertices.iter() {
+    //   vertex_data.push(Vertex { position: *v, color: [0.0, 0.0, 0.0] });
+    // }
+    // let index_data = a.indices.to_vec();
+
+
+
+
+
     Self {
       window: None,
       gfx_state: None,
@@ -106,7 +122,7 @@ impl App {
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
         view: &texture_view,
         resolve_target: None,
-        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::RED), store: wgpu::StoreOp::Store }
+        ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::WHITE), store: wgpu::StoreOp::Store }
       })], 
       depth_stencil_attachment: None, 
       timestamp_writes: None, 
@@ -218,10 +234,17 @@ impl GfxState {
 				..Default::default()
 			}
 		).await.unwrap();
-		let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor{..Default::default()}).await.unwrap();
+		let (device, queue) = adapter.request_device(
+      &wgpu::DeviceDescriptor{
+        required_features: wgpu::Features::POLYGON_MODE_LINE,                 // changed
+        ..Default::default()
+      }
+    ).await.unwrap();
     let surface_fmt = surface.get_capabilities(&adapter).formats[0];
 
     // creating the index and vertex buffers here, probably
+
+    
 
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Vertex buffer"),
@@ -270,6 +293,7 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         front_face: wgpu::FrontFace::Ccw, 
         cull_mode: Some(wgpu::Face::Back), 
+        polygon_mode: wgpu::PolygonMode::Line,                                                                 // changed
         ..Default::default()
       }, 
       depth_stencil: None, 
