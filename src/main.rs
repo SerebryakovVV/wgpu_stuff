@@ -279,7 +279,7 @@ impl GfxState {
       entries: &[
         wgpu::BindGroupLayoutEntry {
           binding: 0,
-          visibility: wgpu::ShaderStages::VERTEX,
+          visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
           count: None,
           ty: wgpu::BindingType::Buffer {
             ty: wgpu::BufferBindingType::Uniform, 
@@ -337,7 +337,8 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         front_face: wgpu::FrontFace::Ccw, 
         cull_mode: Some(wgpu::Face::Back), 
-        polygon_mode: wgpu::PolygonMode::Line,                                                                 // changed
+        polygon_mode: wgpu::PolygonMode::Fill,                                                                 // changed
+        // polygon_mode: wgpu::PolygonMode::Line,                                                                 // changed
         ..Default::default()
       }, 
       depth_stencil: None, 
