@@ -25,9 +25,9 @@ use model::Model;
 
 use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
-use wgpu::{util::DeviceExt, Adapter, Buffer, Device, Instance, Queue, RenderPipeline, ShaderModule, Surface, TextureFormat};
+use wgpu::{util::DeviceExt, Adapter, BindGroup, Buffer, Device, Instance, Queue, RenderPipeline, ShaderModule, Surface, TextureFormat};
 use winit::{
-  application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent, event_loop::{
+  application::ApplicationHandler, dpi::{PhysicalPosition, PhysicalSize}, event::WindowEvent, event_loop::{
     self,
     ActiveEventLoop,
     EventLoop
@@ -57,33 +57,18 @@ struct Vertex {
 struct App {
   window: Option<Arc<Window>>,
   gfx_state: Option<GfxState>,
-  bodies: Vec<Body>
+  bodies: Vec<Body>,
+  mouse_pos: PhysicalPosition<f64>
 }
 
 impl App {
   fn new() -> Self {
 
-    // let vertex_data = vec![
-    //   Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [-1.0,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    // ];
-    // let index_data = vec![
-    //   0, 1, 2, 
-    //   2, 3, 0, 
-    //   3, 4, 0
-    // ];
-
-
-
-
     let vertex_data = vec![
-      Vertex { position: [ 0.0, 0.0, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 0.10, 0.40, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 0.05,  0.48, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 0.0,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
     ];
     let index_data = vec![
       0, 1, 2, 
@@ -99,16 +84,14 @@ impl App {
     // let index_data = a.indices.to_vec();
 
 
-
-
-
     Self {
       window: None,
       gfx_state: None,
       bodies: vec![Body {
         vertex_data,
         index_data
-      }]
+      }],
+      mouse_pos: PhysicalPosition { x: 0.0, y: 0.0 }
     }
   }
 
@@ -131,6 +114,11 @@ impl App {
     renderpass.set_pipeline(&gfx_state.render_pipeline);
     renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
     renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+    
+    ///////////////////////////////////////////////////
+    renderpass.set_bind_group(0, &gfx_state.uniform_bind_group, &[]);
+    
+    
     renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
 
     drop(renderpass);
@@ -190,6 +178,24 @@ impl ApplicationHandler for App {
   ) {
     match event {
       WindowEvent::CursorEntered { .. } => println!("Cursor entered"),
+      WindowEvent::CursorMoved { position, .. } => {
+        // println!("{:?}", position);
+                        // self.mouse_pos = position;
+                        let gfx_state = self.gfx_state.as_mut().unwrap();
+                let size = gfx_state.size;
+
+                let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
+                let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0); // flip Y
+
+                // let uniforms = Uniforms { offset: [x, y] };
+
+                gfx_state.queue.write_buffer(
+                    &gfx_state.uniform_buffer,
+                    0,
+                    bytemuck::cast_slice(&[x, y]),
+                );
+                self.window.as_ref().unwrap().request_redraw();
+      },
       WindowEvent::Resized(size) => {
         if size.height > 0 && size.width > 0 {
           self.configure_surface();
@@ -220,7 +226,9 @@ struct GfxState {
   vertex_buffer: Buffer,
   index_buffer: Buffer,
   shader: ShaderModule,
-  render_pipeline: RenderPipeline
+  render_pipeline: RenderPipeline,
+  uniform_buffer: Buffer,
+  uniform_bind_group: BindGroup
 }
 
 impl GfxState {
@@ -257,10 +265,46 @@ impl GfxState {
       usage: wgpu::BufferUsages::INDEX,
       contents: bytemuck::cast_slice(&bodies[0].index_data)
     });
+
+
+    
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+      label: Some("uniform buffer"), 
+      contents: bytemuck::cast_slice(&[0.0, 0.0]), 
+      usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+    });
+    let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      label: Some("uniform buffer layout"),
+      entries: &[
+        wgpu::BindGroupLayoutEntry {
+          binding: 0,
+          visibility: wgpu::ShaderStages::VERTEX,
+          count: None,
+          ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform, 
+            has_dynamic_offset: false, 
+            min_binding_size: None 
+          }
+        }
+      ]
+    });
+    let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("uniform bind group"),
+      layout: &uniform_bind_group_layout,
+      entries: &[wgpu::BindGroupEntry {
+        binding: 0,
+        resource: uniform_buffer.as_entire_binding()
+      }]
+    });
+
+
+
+
     let shader = device.create_shader_module(wgpu::include_wgsl!("3d_model_render_shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
       label: Some("pipeline layout label"), 
-      bind_group_layouts: &[], 
+      bind_group_layouts: &[&uniform_bind_group_layout], 
       push_constant_ranges: &[] 
     });
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor { 
@@ -322,7 +366,9 @@ impl GfxState {
       vertex_buffer,
       index_buffer,
       shader,
-      render_pipeline
+      render_pipeline,
+      uniform_buffer,
+      uniform_bind_group
     }
   }
 }
