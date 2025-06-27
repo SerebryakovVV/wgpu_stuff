@@ -1,27 +1,8 @@
-// first of all we create a window
-// for the window we need an event loop
-// event loop has the run_app function that takes a struct that implements ApplicationHandler trait
-// we create an App struct that implements this trait, and pass it to the run_app
-// the trait requires two methods, and has some number of optinal methods
-// the window_event method on ApplicationHandler trait handles all the events of the window
-
-// now with window created we make an Instance, it takes env variables to configure itself
-// with this instance we can create a surface and an adapter
-// with adapter we can create device and a queue
-
-
-
-
-// triangle fan, shader masking
-// instancing
-// shader module
-// pipeline layout
-// pipeline 
-// render method update
-
 mod model;
-use model::Model;
-// use model;
+mod cube;
+use model::{Model, Vertex};
+use cube::make_cube;
+
 
 use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
@@ -39,58 +20,33 @@ use winit::{
 };
 
 
-
-
-struct Body {
-  vertex_data: Vec<Vertex>,
-  index_data: Vec<u16>
-}
-
-#[repr(C)]
-#[derive(Pod, Clone, Copy, Zeroable)]
-struct Vertex {
-  position: [f32; 3],
-  color: [f32; 3]
-}
-
-
 struct App {
   window: Option<Arc<Window>>,
   gfx_state: Option<GfxState>,
-  bodies: Vec<Body>,
+  bodies: Vec<Model>,
   mouse_pos: PhysicalPosition<f64>
 }
 
 impl App {
   fn new() -> Self {
-
-    let vertex_data = vec![
-      Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    let vertices = vec![
+      Vertex { position: [-1.0, -1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 1.0, -1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [ 1.0,  1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
+      Vertex { position: [-1.0,  1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
     ];
-    let index_data = vec![
+    let indices = vec![
       0, 1, 2, 
       2, 3, 0, 
     ];
-
-
-    // let a = Model::from_obj("src/teapot.obj").unwrap();
-    // let mut vertex_data = Vec::new();
-    // for v in a.vertices.iter() {
-    //   vertex_data.push(Vertex { position: *v, color: [0.0, 0.0, 0.0] });
-    // }
-    // let index_data = a.indices.to_vec();
-
-
     Self {
       window: None,
       gfx_state: None,
-      bodies: vec![Body {
-        vertex_data,
-        index_data
+      bodies: vec![Model {
+        vertices,
+        indices
       }],
+      // bodies: vec![make_cube()],
       mouse_pos: PhysicalPosition { x: 0.0, y: 0.0 }
     }
   }
@@ -114,13 +70,8 @@ impl App {
     renderpass.set_pipeline(&gfx_state.render_pipeline);
     renderpass.set_vertex_buffer(0, gfx_state.vertex_buffer.slice(..));
     renderpass.set_index_buffer(gfx_state.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-    
-    ///////////////////////////////////////////////////
     renderpass.set_bind_group(0, &gfx_state.uniform_bind_group, &[]);
-    
-    
     renderpass.draw_indexed(0..gfx_state.index_buffer.size() as u32 / std::mem::size_of::<u16>() as u32, 0, 0..1);
-
     drop(renderpass);
     gfx_state.queue.submit([encoder.finish()]);
     self.window.as_ref().unwrap().pre_present_notify();
@@ -141,7 +92,6 @@ impl App {
       view_formats: vec![gfx_state.surface_fmt.add_srgb_suffix()]
     };
     gfx_state.surface.configure(&gfx_state.device, &config);
-    // self.render();
   }
 }
 
@@ -170,46 +120,24 @@ impl ApplicationHandler for App {
     self.configure_surface();
   }
 
-  fn window_event(
-    &mut self,
-    event_loop: &ActiveEventLoop,
-    window_id: WindowId,
-    event: WindowEvent,
-  ) {
+  fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
     match event {
-      WindowEvent::CursorEntered { .. } => println!("Cursor entered"),
       WindowEvent::CursorMoved { position, .. } => {
-        // println!("{:?}", position);
-                        // self.mouse_pos = position;
-                        let gfx_state = self.gfx_state.as_mut().unwrap();
-                let size = gfx_state.size;
-
-                let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
-                let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0); // flip Y
-
-                // let uniforms = Uniforms { offset: [x, y] };
-
-                gfx_state.queue.write_buffer(
-                    &gfx_state.uniform_buffer,
-                    0,
-                    bytemuck::cast_slice(&[x, y]),
-                );
-                self.window.as_ref().unwrap().request_redraw();
+        let gfx_state = self.gfx_state.as_mut().unwrap();
+        let size = gfx_state.size;
+        let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
+        let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0);
+        gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[x, y]));
+        self.window.as_ref().unwrap().request_redraw();
       },
       WindowEvent::Resized(size) => {
         if size.height > 0 && size.width > 0 {
           self.configure_surface();
         }
-        println!("Resized to {:#?}", size);
       },
-      WindowEvent::CloseRequested => {
-        println!("Close requested");
-        event_loop.exit()
-      },
+      WindowEvent::CloseRequested => event_loop.exit(),
       WindowEvent::RedrawRequested => self.render(),
-      _ => {
-        // println!("Rest of the events");
-      }
+      _ => ()
     }
   }
 }
@@ -232,7 +160,7 @@ struct GfxState {
 }
 
 impl GfxState {
-  async fn setup(window: Arc<Window>, bodies: &Vec<Body>) -> Self {
+  async fn setup(window: Arc<Window>, bodies: &Vec<Model>) -> Self {
 		let instance = Instance::new(&wgpu::InstanceDescriptor::from_env_or_default());
 		let surface = instance.create_surface(window.clone()).unwrap();
     let size = window.inner_size();
@@ -244,31 +172,21 @@ impl GfxState {
 		).await.unwrap();
 		let (device, queue) = adapter.request_device(
       &wgpu::DeviceDescriptor{
-        required_features: wgpu::Features::POLYGON_MODE_LINE,                 // changed
+        required_features: wgpu::Features::POLYGON_MODE_LINE,
         ..Default::default()
       }
     ).await.unwrap();
     let surface_fmt = surface.get_capabilities(&adapter).formats[0];
-
-    // creating the index and vertex buffers here, probably
-
-    
-
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Vertex buffer"),
       usage: wgpu::BufferUsages::VERTEX,
-      contents: bytemuck::cast_slice(&bodies[0].vertex_data)
-    });    
-
+      contents: bytemuck::cast_slice(&bodies[0].vertices)
+    });
     let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("Index buffer"),
       usage: wgpu::BufferUsages::INDEX,
-      contents: bytemuck::cast_slice(&bodies[0].index_data)
+      contents: bytemuck::cast_slice(&bodies[0].indices)
     });
-
-
-    
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
       label: Some("uniform buffer"), 
       contents: bytemuck::cast_slice(&[0.0, 0.0]), 
@@ -297,10 +215,6 @@ impl GfxState {
         resource: uniform_buffer.as_entire_binding()
       }]
     });
-
-
-
-
     let shader = device.create_shader_module(wgpu::include_wgsl!("3d_model_render_shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
       label: Some("pipeline layout label"), 
@@ -337,8 +251,7 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         front_face: wgpu::FrontFace::Ccw, 
         cull_mode: Some(wgpu::Face::Back), 
-        polygon_mode: wgpu::PolygonMode::Fill,                                                                 // changed
-        // polygon_mode: wgpu::PolygonMode::Line,                                                                 // changed
+        polygon_mode: wgpu::PolygonMode::Fill,
         ..Default::default()
       }, 
       depth_stencil: None, 
@@ -373,7 +286,6 @@ impl GfxState {
     }
   }
 }
-
 
 
 fn main() {
