@@ -2,7 +2,8 @@ mod model;
 mod cube;
 use model::{Model, Vertex};
 use cube::make_cube;
-
+use cgmath::{self, Deg, Matrix4};
+use cgmath::prelude::*;
 
 use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
@@ -19,6 +20,12 @@ use winit::{
   }
 };
 
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+struct Uniforms {
+  mvp: [[f32; 4]; 4]
+}
+
 
 struct App {
   window: Option<Arc<Window>>,
@@ -29,24 +36,24 @@ struct App {
 
 impl App {
   fn new() -> Self {
-    let vertices = vec![
-      Vertex { position: [-1.0, -1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 1.0, -1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [ 1.0,  1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
-      Vertex { position: [-1.0,  1.0, 0.0], color: [0.0, 0.0, 0.0] }, 
-    ];
-    let indices = vec![
-      0, 1, 2, 
-      2, 3, 0, 
-    ];
+    // let vertices = vec![
+    //   Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    //   Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
+    // ];
+    // let indices = vec![
+    //   0, 1, 2, 
+    //   2, 3, 0, 
+    // ];
     Self {
       window: None,
       gfx_state: None,
-      bodies: vec![Model {
-        vertices,
-        indices
-      }],
-      // bodies: vec![make_cube()],
+      // bodies: vec![Model {
+      //   vertices,
+      //   indices
+      // }],
+      bodies: vec![make_cube()],
       mouse_pos: PhysicalPosition { x: 0.0, y: 0.0 }
     }
   }
@@ -123,12 +130,39 @@ impl ApplicationHandler for App {
   fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
     match event {
       WindowEvent::CursorMoved { position, .. } => {
+        // let gfx_state = self.gfx_state.as_mut().unwrap();
+        // let size = gfx_state.size;
+        // let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
+        // let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0);
+        // gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[x, y]));
+        // self.window.as_ref().unwrap().request_redraw();
+
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         let gfx_state = self.gfx_state.as_mut().unwrap();
-        let size = gfx_state.size;
-        let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
-        let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0);
-        gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[x, y]));
+        let projection = cgmath::perspective(
+          cgmath::Deg(75.0), 
+          gfx_state.size.width as f32 / gfx_state.size.height as f32, 
+          0.1, 
+          100.0
+        );
+        let view = cgmath::Matrix4::look_at_rh(
+          cgmath::Point3::new(0.0, 0.0, 3.0),
+          cgmath::Point3::new(0.0, 0.0, 0.0), 
+          cgmath::Vector3::unit_y()
+        );
+        // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
+        
+        let rotation_x = Matrix4::from_angle_x(Deg((position.x / 5.0) as f32)); 
+        let rotation_y = Matrix4::from_angle_y(Deg((position.x / 5.0) as f32));
+        let rotation_z = Matrix4::from_angle_z(Deg((position.x / 5.0) as f32));
+        let model_matrix = rotation_z * rotation_y * rotation_x;
+
+        let mvp_matrix = Uniforms {
+          mvp: (projection * view * model_matrix).into()
+        };
+        gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
         self.window.as_ref().unwrap().request_redraw();
+        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       },
       WindowEvent::Resized(size) => {
         if size.height > 0 && size.width > 0 {
@@ -187,9 +221,81 @@ impl GfxState {
       usage: wgpu::BufferUsages::INDEX,
       contents: bytemuck::cast_slice(&bodies[0].indices)
     });
+    
+    
+    // let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //   label: Some("uniform buffer"), 
+    //   contents: bytemuck::cast_slice(&[0.0, 0.0]), 
+    //   usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
+    // });
+    // let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    //   label: Some("uniform buffer layout"),
+    //   entries: &[
+    //     wgpu::BindGroupLayoutEntry {
+    //       binding: 0,
+    //       visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+    //       count: None,
+    //       ty: wgpu::BindingType::Buffer {
+    //         ty: wgpu::BufferBindingType::Uniform, 
+    //         has_dynamic_offset: false, 
+    //         min_binding_size: None 
+    //       }
+    //     }
+    //   ]
+    // });
+    // let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    //   label: Some("uniform bind group"),
+    //   layout: &uniform_bind_group_layout,
+    //   entries: &[wgpu::BindGroupEntry {
+    //     binding: 0,
+    //     resource: uniform_buffer.as_entire_binding()
+    //   }]
+    // });
+
+
+
+
+    let projection = cgmath::perspective(
+      cgmath::Deg(75.0), 
+      size.width as f32 / size.height as f32, 
+      0.1, 
+      100.0
+    );
+    let view = cgmath::Matrix4::look_at_rh(
+      cgmath::Point3::new(0.0, 0.0, 3.0),
+      cgmath::Point3::new(0.0, 0.0, 0.0), 
+      cgmath::Vector3::unit_y()
+    );
+    let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
+    let mvp_matrix = Uniforms {
+      mvp: (projection * view * model_matrix).into()
+    };
+
+
+
+    // this part somewhat works
+    //     let projection = cgmath::perspective(
+    //   cgmath::Deg(45.0), 
+    //   size.width as f32 / size.height as f32, 
+    //   0.1, 
+    //   100.0
+    // );
+    // let view = cgmath::Matrix4::look_at_rh(
+    //   cgmath::Point3::new(0.0, 0.0, 3.0),
+    //   cgmath::Point3::new(0.0, 0.0, 0.0), 
+    //   cgmath::Vector3::unit_y()
+    // );
+    // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(45.0));
+    // let mvp_matrix = Uniforms {
+    //   mvp: (projection * view * model_matrix).into()
+    // };
+
+
+
+
     let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-      label: Some("uniform buffer"), 
-      contents: bytemuck::cast_slice(&[0.0, 0.0]), 
+      label: Some("matrix unifrom buffer"),
+      contents: bytemuck::cast_slice(&[mvp_matrix]),
       usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
     });
     let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -215,6 +321,8 @@ impl GfxState {
         resource: uniform_buffer.as_entire_binding()
       }]
     });
+
+
     let shader = device.create_shader_module(wgpu::include_wgsl!("3d_model_render_shader.wgsl"));
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { 
       label: Some("pipeline layout label"), 
@@ -249,6 +357,7 @@ impl GfxState {
       }, 
       primitive: wgpu::PrimitiveState { 
         topology: wgpu::PrimitiveTopology::TriangleList, 
+        // topology: wgpu::PrimitiveTopology::LineList, 
         front_face: wgpu::FrontFace::Ccw, 
         cull_mode: Some(wgpu::Face::Back), 
         polygon_mode: wgpu::PolygonMode::Fill,
