@@ -448,8 +448,9 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         // topology: wgpu::PrimitiveTopology::LineList, 
         front_face: wgpu::FrontFace::Ccw, 
-        // cull_mode: Some(wgpu::Face::Back), 
-        cull_mode: None, 
+        // cull_mode: Some(wgpu::Face::Front), 
+        cull_mode: Some(wgpu::Face::Back), 
+        // cull_mode: None, 
         polygon_mode: wgpu::PolygonMode::Fill,
         ..Default::default()
       }, 
