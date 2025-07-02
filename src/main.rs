@@ -4,6 +4,7 @@ use model::{Model, Vertex};
 use cube::make_cube;
 use cgmath::{self, Deg, Matrix4};
 use cgmath::prelude::*;
+use winit::keyboard::KeyCode;
 
 use std::{mem, sync::Arc};
 use bytemuck::{Pod, Zeroable};
@@ -26,33 +27,94 @@ struct Uniforms {
   mvp: [[f32; 4]; 4]
 }
 
+struct View {
+  uni: Uniforms,
+  
+  projection: Matrix4<f32>,
+  fovy: Deg<f32>,
+  aspect: f32, 
+  near: f32, 
+  far: f32,
+
+  view: Matrix4<f32>,
+  
+  
+  // these two for camera control
+  eye: cgmath::Point3<f32>,
+  eye_x: f32,
+  eye_y: f32,
+  eye_z: f32,
+  center: cgmath::Point3<f32>,
+  center_x: f32,
+  center_y: f32,
+  center_z: f32,
+  
+  
+  
+  up: cgmath::Vector3<f32>,
+
+  model_matrix: Matrix4<f32>,
+  rotation_x: Matrix4<f32>,
+  rotation_y: Matrix4<f32>,
+  rotation_z: Matrix4<f32>
+}
+
+
+impl View {
+  fn compute_uniforms(&mut self) -> Uniforms {
+    // let fovy = cgmath::Deg(75.0);
+    // let aspect = size.width as f32 / size.height as f32;
+    // let near = 0.1;
+    // let far = 100.0;
+    // let projection = cgmath::perspective(fovy, aspect, near, far);
+    
+    
+    
+    // let eye_x = 0.0;
+    // let eye_y = 0.0;
+    // let eye_z = 3.0;
+    // let eye = cgmath::Point3::new(eye_x, eye_y, eye_z);
+
+
+    // let center_x = 0.0;
+    // let center_y = 0.0;
+    // let center_z = 0.0;
+    // let center = cgmath::Point3::new(center_x, center_y, center_z);
+
+
+
+    // let up = cgmath::Vector3::unit_y();
+    // let view = cgmath::Matrix4::look_at_rh(eye, center, up);
+        
+    // let rotation_x = Matrix4::from_angle_x(Deg(60.0)); 
+    // let rotation_y = Matrix4::from_angle_y(Deg(60.0));
+    // let rotation_z = Matrix4::from_angle_z(Deg(60.0));
+    // let model_matrix = rotation_z * rotation_y * rotation_x;
+
+    // let mvp_matrix = Uniforms {
+    //   mvp: (projection * view * model_matrix).into()
+    // };
+
+    self.eye = cgmath::Point3::new(self.eye_x, self.eye_y, self.eye_z);
+    self.center = cgmath::Point3::new(self.center_x, self.center_y, self.center_z);
+    self.view = cgmath::Matrix4::look_at_rh(self.eye, self.center, self.up);
+    self.uni.mvp = (self.projection * self.view * self.model_matrix).into();
+    self.uni
+  }
+}
 
 struct App {
   window: Option<Arc<Window>>,
   gfx_state: Option<GfxState>,
   bodies: Vec<Model>,
-  mouse_pos: PhysicalPosition<f64>
+  mouse_pos: PhysicalPosition<f64>,
 }
 
 impl App {
   fn new() -> Self {
-    // let vertices = vec![
-    //   Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [ 0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    //   Vertex { position: [-0.5,  0.5, 0.0], color: [0.0, 0.0, 0.0] }, 
-    // ];
-    // let indices = vec![
-    //   0, 1, 2, 
-    //   2, 3, 0, 
-    // ];
     Self {
       window: None,
       gfx_state: None,
-      // bodies: vec![Model {
-      //   vertices,
-      //   indices
-      // }],
       bodies: vec![make_cube()],
       mouse_pos: PhysicalPosition { x: 0.0, y: 0.0 }
     }
@@ -130,40 +192,78 @@ impl ApplicationHandler for App {
   fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
     match event {
       WindowEvent::CursorMoved { position, .. } => {
-        // let gfx_state = self.gfx_state.as_mut().unwrap();
-        // let size = gfx_state.size;
-        // let x = (position.x / size.width as f64) as f32 * 2.0 - 1.0;
-        // let y = -((position.y / size.height as f64) as f32 * 2.0 - 1.0);
-        // gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[x, y]));
-        // self.window.as_ref().unwrap().request_redraw();
+
 
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        let gfx_state = self.gfx_state.as_mut().unwrap();
-        let projection = cgmath::perspective(
-          cgmath::Deg(75.0), 
-          gfx_state.size.width as f32 / gfx_state.size.height as f32, 
-          0.1, 
-          100.0
-        );
-        let view = cgmath::Matrix4::look_at_rh(
-          cgmath::Point3::new(0.0, 0.0, 3.0),
-          cgmath::Point3::new(0.0, 0.0, 0.0), 
-          cgmath::Vector3::unit_y()
-        );
-        // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
-        
-        let rotation_x = Matrix4::from_angle_x(Deg((position.x / 5.0) as f32)); 
-        let rotation_y = Matrix4::from_angle_y(Deg((position.x / 5.0) as f32));
-        let rotation_z = Matrix4::from_angle_z(Deg((position.x / 5.0) as f32));
-        let model_matrix = rotation_z * rotation_y * rotation_x;
+        // let gfx_state = self.gfx_state.as_mut().unwrap();
 
-        let mvp_matrix = Uniforms {
-          mvp: (projection * view * model_matrix).into()
-        };
-        gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-        self.window.as_ref().unwrap().request_redraw();
+        // let projection = cgmath::perspective(
+        //   cgmath::Deg(75.0), 
+        //   gfx_state.size.width as f32 / gfx_state.size.height as f32, 
+        //   0.1, 
+        //   100.0
+        // );
+        // let view = cgmath::Matrix4::look_at_rh(
+        //   cgmath::Point3::new(0.0, 0.0, 3.0),
+        //   cgmath::Point3::new(0.0, 0.0, 0.0), 
+        //   cgmath::Vector3::unit_y()
+        // );
+        // // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
+        
+        // let rotation_x = Matrix4::from_angle_x(Deg((position.x / 5.0) as f32)); 
+        // let rotation_y = Matrix4::from_angle_y(Deg((position.x / 5.0) as f32));
+        // let rotation_z = Matrix4::from_angle_z(Deg((position.x / 5.0) as f32));
+        // let model_matrix = rotation_z * rotation_y * rotation_x;
+
+        // let mvp_matrix = Uniforms {
+        //   mvp: (projection * view * model_matrix).into()
+        // };
+        // gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+        // self.window.as_ref().unwrap().request_redraw();
         //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       },
+      WindowEvent::KeyboardInput { device_id, event, is_synthetic } => {
+        match event.physical_key {
+          winit::keyboard::PhysicalKey::Code(k) => {
+            match k {
+              KeyCode::KeyW => {
+                let gfx_state = self.gfx_state.as_mut().unwrap();
+                gfx_state.view.eye_z -= 0.1;
+                gfx_state.view.center_z -= 0.1;
+                let mvp_matrix = gfx_state.view.compute_uniforms();
+                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+                self.window.as_ref().unwrap().request_redraw();
+              },
+              KeyCode::KeyS => {
+                let gfx_state = self.gfx_state.as_mut().unwrap();
+                gfx_state.view.eye_z += 0.1;
+                gfx_state.view.center_z += 0.1;
+                let mvp_matrix = gfx_state.view.compute_uniforms();
+                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+                self.window.as_ref().unwrap().request_redraw();
+              },
+              KeyCode::KeyA => {
+                let gfx_state = self.gfx_state.as_mut().unwrap();
+                gfx_state.view.eye_x -= 0.1;
+                gfx_state.view.center_x -= 0.1;
+                let mvp_matrix = gfx_state.view.compute_uniforms();
+                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+                self.window.as_ref().unwrap().request_redraw();
+              },
+              KeyCode::KeyD => {
+                let gfx_state = self.gfx_state.as_mut().unwrap();
+                gfx_state.view.eye_x += 0.1;
+                gfx_state.view.center_x += 0.1;
+                let mvp_matrix = gfx_state.view.compute_uniforms();
+                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+                self.window.as_ref().unwrap().request_redraw();
+              },
+              _ => {}
+            }
+          },
+          _ => {}
+        }
+      }
       WindowEvent::Resized(size) => {
         if size.height > 0 && size.width > 0 {
           self.configure_surface();
@@ -190,7 +290,8 @@ struct GfxState {
   shader: ShaderModule,
   render_pipeline: RenderPipeline,
   uniform_buffer: Buffer,
-  uniform_bind_group: BindGroup
+  uniform_bind_group: BindGroup,
+  view: View
 }
 
 impl GfxState {
@@ -223,73 +324,61 @@ impl GfxState {
     });
     
     
-    // let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-    //   label: Some("uniform buffer"), 
-    //   contents: bytemuck::cast_slice(&[0.0, 0.0]), 
-    //   usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
-    // });
-    // let uniform_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-    //   label: Some("uniform buffer layout"),
-    //   entries: &[
-    //     wgpu::BindGroupLayoutEntry {
-    //       binding: 0,
-    //       visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-    //       count: None,
-    //       ty: wgpu::BindingType::Buffer {
-    //         ty: wgpu::BufferBindingType::Uniform, 
-    //         has_dynamic_offset: false, 
-    //         min_binding_size: None 
-    //       }
-    //     }
-    //   ]
-    // });
-    // let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-    //   label: Some("uniform bind group"),
-    //   layout: &uniform_bind_group_layout,
-    //   entries: &[wgpu::BindGroupEntry {
-    //     binding: 0,
-    //     resource: uniform_buffer.as_entire_binding()
-    //   }]
-    // });
+    let fovy = cgmath::Deg(75.0);
+    let aspect = size.width as f32 / size.height as f32;
+    let near = 0.1;
+    let far = 100.0;
+    let projection = cgmath::perspective(fovy, aspect, near, far);
+    
+    
+    
+    let eye_x = 0.0;
+    let eye_y = 0.0;
+    let eye_z = 3.0;
+    let eye = cgmath::Point3::new(eye_x, eye_y, eye_z);
+
+
+    let center_x = 0.0;
+    let center_y = 0.0;
+    let center_z = 0.0;
+    let center = cgmath::Point3::new(center_x, center_y, center_z);
 
 
 
+    let up = cgmath::Vector3::unit_y();
+    let view = cgmath::Matrix4::look_at_rh(eye, center, up);
+        
+    let rotation_x = Matrix4::from_angle_x(Deg(60.0)); 
+    let rotation_y = Matrix4::from_angle_y(Deg(60.0));
+    let rotation_z = Matrix4::from_angle_z(Deg(60.0));
+    let model_matrix = rotation_z * rotation_y * rotation_x;
 
-    let projection = cgmath::perspective(
-      cgmath::Deg(75.0), 
-      size.width as f32 / size.height as f32, 
-      0.1, 
-      100.0
-    );
-    let view = cgmath::Matrix4::look_at_rh(
-      cgmath::Point3::new(0.0, 0.0, 3.0),
-      cgmath::Point3::new(0.0, 0.0, 0.0), 
-      cgmath::Vector3::unit_y()
-    );
-    let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
     let mvp_matrix = Uniforms {
       mvp: (projection * view * model_matrix).into()
     };
 
-
-
-    // this part somewhat works
-    //     let projection = cgmath::perspective(
-    //   cgmath::Deg(45.0), 
-    //   size.width as f32 / size.height as f32, 
-    //   0.1, 
-    //   100.0
-    // );
-    // let view = cgmath::Matrix4::look_at_rh(
-    //   cgmath::Point3::new(0.0, 0.0, 3.0),
-    //   cgmath::Point3::new(0.0, 0.0, 0.0), 
-    //   cgmath::Vector3::unit_y()
-    // );
-    // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(45.0));
-    // let mvp_matrix = Uniforms {
-    //   mvp: (projection * view * model_matrix).into()
-    // };
-
+    let mut view_main = View {
+      uni: mvp_matrix,
+      fovy,
+      aspect,
+      near,
+      far,
+      projection,
+      eye_x,
+      eye_y,
+      eye_z,
+      eye,
+      center_x,
+      center_y,
+      center_z,
+      center,
+      up,
+      view,
+      rotation_x,
+      rotation_y,
+      rotation_z,
+      model_matrix
+    };
 
 
 
@@ -359,7 +448,8 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         // topology: wgpu::PrimitiveTopology::LineList, 
         front_face: wgpu::FrontFace::Ccw, 
-        cull_mode: Some(wgpu::Face::Back), 
+        // cull_mode: Some(wgpu::Face::Back), 
+        cull_mode: None, 
         polygon_mode: wgpu::PolygonMode::Fill,
         ..Default::default()
       }, 
@@ -391,7 +481,8 @@ impl GfxState {
       shader,
       render_pipeline,
       uniform_buffer,
-      uniform_bind_group
+      uniform_bind_group,
+      view: view_main
     }
   }
 }
