@@ -48,6 +48,8 @@ struct View {
   center_x: f32,
   center_y: f32,
   center_z: f32,
+  yaw: f32, 
+  pitch: f32, 
   
   
   
@@ -62,44 +64,26 @@ struct View {
 
 impl View {
   fn compute_uniforms(&mut self) -> Uniforms {
-    // let fovy = cgmath::Deg(75.0);
-    // let aspect = size.width as f32 / size.height as f32;
-    // let near = 0.1;
-    // let far = 100.0;
-    // let projection = cgmath::perspective(fovy, aspect, near, far);
-    
-    
-    
-    // let eye_x = 0.0;
-    // let eye_y = 0.0;
-    // let eye_z = 3.0;
-    // let eye = cgmath::Point3::new(eye_x, eye_y, eye_z);
-
-
-    // let center_x = 0.0;
-    // let center_y = 0.0;
-    // let center_z = 0.0;
-    // let center = cgmath::Point3::new(center_x, center_y, center_z);
-
-
-
-    // let up = cgmath::Vector3::unit_y();
-    // let view = cgmath::Matrix4::look_at_rh(eye, center, up);
-        
-    // let rotation_x = Matrix4::from_angle_x(Deg(60.0)); 
-    // let rotation_y = Matrix4::from_angle_y(Deg(60.0));
-    // let rotation_z = Matrix4::from_angle_z(Deg(60.0));
-    // let model_matrix = rotation_z * rotation_y * rotation_x;
-
-    // let mvp_matrix = Uniforms {
-    //   mvp: (projection * view * model_matrix).into()
-    // };
-
     self.eye = cgmath::Point3::new(self.eye_x, self.eye_y, self.eye_z);
     self.center = cgmath::Point3::new(self.center_x, self.center_y, self.center_z);
     self.view = cgmath::Matrix4::look_at_rh(self.eye, self.center, self.up);
     self.uni.mvp = (self.projection * self.view * self.model_matrix).into();
     self.uni
+  }
+
+  fn update_direction(&mut self) {
+    let yaw_rad = cgmath::Rad(self.yaw.to_radians());
+    let pitch_rad = cgmath::Rad(self.pitch.to_radians());
+    let direction = cgmath::Vector3 {
+              x: yaw_rad.0.cos() * pitch_rad.0.cos(),
+        y: pitch_rad.0.sin(),
+        z: yaw_rad.0.sin() * pitch_rad.0.cos(),
+
+    }.normalize();
+        self.center = self.eye + direction;
+    self.center_x = self.center.x;
+    self.center_y = self.center.y;
+    self.center_z = self.center.z;
   }
 }
 
@@ -186,84 +170,67 @@ impl ApplicationHandler for App {
         )
       )
     );
+    // self.window.as_ref().unwrap().set_cursor_grab(winit::window::CursorGrabMode::Confined).unwrap();
     self.configure_surface();
+  }
+
+  fn device_event(&mut self, event_loop: &ActiveEventLoop, device_id: winit::event::DeviceId, event: winit::event::DeviceEvent,) {
+    match event {
+      winit::event::DeviceEvent::MouseMotion { delta } => {
+        let gfx_state = self.gfx_state.as_mut().unwrap();
+        let sensitivity = 0.1;
+        gfx_state.view.yaw += (delta.0 as f32) * sensitivity;
+        gfx_state.view.pitch -= (delta.1 as f32) * sensitivity;
+        gfx_state.view.pitch = gfx_state.view.pitch.clamp(-89.0, 89.0);
+        gfx_state.view.update_direction();
+        let mvp_matrix = gfx_state.view.compute_uniforms();
+        gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+        self.window.as_ref().unwrap().request_redraw();
+      },
+      _ => {}
+    }
   }
 
   fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
     match event {
-      WindowEvent::CursorMoved { position, .. } => {
-
-
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // let gfx_state = self.gfx_state.as_mut().unwrap();
-
-        // let projection = cgmath::perspective(
-        //   cgmath::Deg(75.0), 
-        //   gfx_state.size.width as f32 / gfx_state.size.height as f32, 
-        //   0.1, 
-        //   100.0
-        // );
-        // let view = cgmath::Matrix4::look_at_rh(
-        //   cgmath::Point3::new(0.0, 0.0, 3.0),
-        //   cgmath::Point3::new(0.0, 0.0, 0.0), 
-        //   cgmath::Vector3::unit_y()
-        // );
-        // // let model_matrix = Matrix4::<f32>::from_angle_y(Deg(65.0));
-        
-        // let rotation_x = Matrix4::from_angle_x(Deg((position.x / 5.0) as f32)); 
-        // let rotation_y = Matrix4::from_angle_y(Deg((position.x / 5.0) as f32));
-        // let rotation_z = Matrix4::from_angle_z(Deg((position.x / 5.0) as f32));
-        // let model_matrix = rotation_z * rotation_y * rotation_x;
-
-        // let mvp_matrix = Uniforms {
-        //   mvp: (projection * view * model_matrix).into()
-        // };
-        // gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-        // self.window.as_ref().unwrap().request_redraw();
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      },
-      WindowEvent::KeyboardInput { device_id, event, is_synthetic } => {
+      WindowEvent::KeyboardInput { event, .. } => {
         match event.physical_key {
           winit::keyboard::PhysicalKey::Code(k) => {
+            let gfx_state = self.gfx_state.as_mut().unwrap();
             match k {
               KeyCode::KeyW => {
-                let gfx_state = self.gfx_state.as_mut().unwrap();
                 gfx_state.view.eye_z -= 0.1;
                 gfx_state.view.center_z -= 0.1;
-                let mvp_matrix = gfx_state.view.compute_uniforms();
-                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-                self.window.as_ref().unwrap().request_redraw();
               },
               KeyCode::KeyS => {
-                let gfx_state = self.gfx_state.as_mut().unwrap();
                 gfx_state.view.eye_z += 0.1;
                 gfx_state.view.center_z += 0.1;
-                let mvp_matrix = gfx_state.view.compute_uniforms();
-                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-                self.window.as_ref().unwrap().request_redraw();
               },
               KeyCode::KeyA => {
-                let gfx_state = self.gfx_state.as_mut().unwrap();
                 gfx_state.view.eye_x -= 0.1;
                 gfx_state.view.center_x -= 0.1;
-                let mvp_matrix = gfx_state.view.compute_uniforms();
-                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-                self.window.as_ref().unwrap().request_redraw();
               },
               KeyCode::KeyD => {
-                let gfx_state = self.gfx_state.as_mut().unwrap();
                 gfx_state.view.eye_x += 0.1;
                 gfx_state.view.center_x += 0.1;
-                let mvp_matrix = gfx_state.view.compute_uniforms();
-                gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
-                self.window.as_ref().unwrap().request_redraw();
+              },
+              KeyCode::ShiftLeft => {
+                gfx_state.view.eye_y -= 0.1;
+                gfx_state.view.center_y -= 0.1;
+              },
+              KeyCode::Space => {
+                gfx_state.view.eye_y += 0.1;
+                gfx_state.view.center_y += 0.1;
               },
               _ => {}
-            }
+            };
+            let mvp_matrix = gfx_state.view.compute_uniforms();
+            gfx_state.queue.write_buffer(&gfx_state.uniform_buffer, 0, bytemuck::cast_slice(&[mvp_matrix]));
+            self.window.as_ref().unwrap().request_redraw();
           },
           _ => {}
         }
-      }
+      },
       WindowEvent::Resized(size) => {
         if size.height > 0 && size.width > 0 {
           self.configure_surface();
@@ -343,6 +310,9 @@ impl GfxState {
     let center_z = 0.0;
     let center = cgmath::Point3::new(center_x, center_y, center_z);
 
+    let yaw = -90.0;
+    let pitch = 0.0;
+
 
 
     let up = cgmath::Vector3::unit_y();
@@ -371,6 +341,8 @@ impl GfxState {
       center_x,
       center_y,
       center_z,
+      yaw,
+      pitch,
       center,
       up,
       view,
@@ -448,8 +420,8 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         // topology: wgpu::PrimitiveTopology::LineList, 
         front_face: wgpu::FrontFace::Ccw, 
-        // cull_mode: Some(wgpu::Face::Front), 
-        cull_mode: Some(wgpu::Face::Back), 
+        cull_mode: Some(wgpu::Face::Front), 
+        // cull_mode: Some(wgpu::Face::Back), 
         // cull_mode: None, 
         polygon_mode: wgpu::PolygonMode::Fill,
         ..Default::default()
