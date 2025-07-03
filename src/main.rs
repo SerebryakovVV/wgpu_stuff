@@ -99,7 +99,8 @@ impl App {
     Self {
       window: None,
       gfx_state: None,
-      bodies: vec![make_cube()],
+      // bodies: vec![make_cube()], // need to return a model here
+      bodies: vec![Model::from_obj("models/teapot.obj").unwrap()],
       mouse_pos: PhysicalPosition { x: 0.0, y: 0.0 }
     }
   }
@@ -420,8 +421,9 @@ impl GfxState {
         topology: wgpu::PrimitiveTopology::TriangleList, 
         // topology: wgpu::PrimitiveTopology::LineList, 
         front_face: wgpu::FrontFace::Ccw, 
-        cull_mode: Some(wgpu::Face::Front), 
-        // cull_mode: Some(wgpu::Face::Back), 
+        // front_face: wgpu::FrontFace::Cw, 
+        // cull_mode: Some(wgpu::Face::Front), 
+        cull_mode: Some(wgpu::Face::Back), 
         // cull_mode: None, 
         polygon_mode: wgpu::PolygonMode::Fill,
         ..Default::default()

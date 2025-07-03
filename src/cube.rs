@@ -3,14 +3,17 @@ use crate::model::{Model, Vertex};
 pub fn make_cube() -> Model {
   Model {
     vertices: vec![
-      Vertex {position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 0.0]},
-      Vertex {position: [0.5, -0.5, -0.5], color: [100.0, 0.0, 0.0]},
-      Vertex {position: [0.5, 0.5, -0.5], color: [0.0, 0.0, 0.0]},
-      Vertex {position: [-0.5, 0.5, -0.5], color: [0.0, 60.0, 0.0]},
-      Vertex {position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 0.0]},
-      Vertex {position: [0.5, -0.5, 0.5], color: [0.0, 0.0, 70.0]},
-      Vertex {position: [0.5, 0.5, 0.5], color: [0.0, 0.0, 0.0]},
-      Vertex {position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 0.0]},
+      // Vertex {position: [-0.5, -0.5, -0.5], color: [0.0, 0.0, 0.0]},
+      // Vertex {position: [0.5, -0.5, -0.5], color: [100.0, 0.0, 0.0]},
+      // Vertex {position: [0.5, 0.5, -0.5], color: [0.0, 0.0, 0.0]},
+      // Vertex {position: [-0.5, 0.5, -0.5], color: [0.0, 60.0, 0.0]},
+      // Vertex {position: [-0.5, -0.5, 0.5], color: [0.0, 0.0, 0.0]},
+      // Vertex {position: [0.5, -0.5, 0.5], color: [0.0, 0.0, 70.0]},
+      // Vertex {position: [0.5, 0.5, 0.5], color: [0.0, 0.0, 0.0]},
+      // Vertex {position: [-0.5, 0.5, 0.5], color: [0.0, 0.0, 0.0]},
+
+
+
       // Vertex {position: [-0.5, -0.5, -0.5], color: [100.0, 100.0, 100.0]},
       // Vertex {position: [0.5, -0.5, -0.5], color: [100.0, 100.0, 100.0]},
       // Vertex {position: [0.5, 0.5, -0.5], color: [100.0, 100.0, 100.0]},
